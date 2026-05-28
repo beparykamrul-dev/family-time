@@ -1,0 +1,237 @@
+version: '3.9'
+
+services:
+  # ============ NGINX REVERSE PROXY ============
+  nginx-reverse-proxy:
+    image: openresty/openresty:alpine
+    container_name: admin-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/admin.conf:/etc/nginx/conf.d/admin.conf:ro
+      - ./nginx/lua:/usr/local/openresty/lualib/modules:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+    environment:
+      - ADMIN_BACKEND=admin-api:8000
+      - AWS_BACKEND=aws-proxy:8000
+      - GCP_BACKEND=gcp-proxy:8000
+    networks:
+      - admin-mesh
+      - admin-internal
+    depends_on:
+      - admin-api
+    restart: always
+
+  # ============ MAIN ADMIN API (FastAPI) ============
+  admin-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.admin
+    container_name: admin-api
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://admin_user:${DB_PASSWORD}@postgres:5432/admin_db
+      - REDIS_URL=redis://redis-cluster:6379/0
+      - ORACLE_API_KEY=${ORACLE_API_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - GCP_SERVICE_ACCOUNT=${GCP_SERVICE_ACCOUNT}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./backend/app:/app/app:ro
+    networks:
+      - admin-internal
+      - admin-mesh
+    depends_on:
+      - postgres
+      - redis-cluster
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============ REDIS CLUSTER (Distributed Cache) ============
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: redis-admin-cache
+    command: redis-server --maxmemory 4gb --maxmemory-policy allkeys-lru --save ""
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - admin-internal
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============ POSTGRESQL (Primary Database) ============
+  postgres:
+    image: postgres:16-alpine
+    container_name: admin-postgres
+    environment:
+      - POSTGRES_USER=admin_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=admin_db
+      - POSTGRES_INITDB_ARGS=-c max_connections=500 -c shared_buffers=256MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/admin_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/admin_seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    networks:
+      - admin-internal
+    expose:
+      - "5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============ ZEROTIER (Secure Mesh Network) ============
+  zerotier:
+    image: zerotier/zerotier:latest
+    container_name: admin-zerotier
+    privileged: true
+    volumes:
+      - zerotier_config:/var/lib/zerotier-one
+    networks:
+      - admin-mesh
+    environment:
+      - ZT_NETWORK_ID=${ZEROTIER_NETWORK_ID}
+    restart: always
+
+  # ============ NETMAKER (Mesh Dashboard) ============
+  netmaker:
+    image: netmaker:latest
+    container_name: admin-netmaker
+    ports:
+      - "8081:8081"
+    volumes:
+      - netmaker_data:/etc/netmaker
+    environment:
+      - MASTER_KEY=${NETMAKER_MASTER_KEY}
+      - API_PORT=8081
+    networks:
+      - admin-mesh
+    restart: always
+
+  # ============ KEEPALIVED (HA/VRRP) ============
+  keepalived:
+    image: alpine:latest
+    container_name: admin-keepalived
+    privileged: true
+    volumes:
+      - ./keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+    command: keepalived -l -D
+    networks:
+      - admin-internal
+    restart: always
+
+  # ============ SYNCTHING (Config Sync) ============
+  syncthing:
+    image: syncthing/syncthing:latest
+    container_name: admin-syncthing
+    ports:
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    volumes:
+      - syncthing_config:/var/syncthing/config
+      - ./config:/var/syncthing/admin-config
+    environment:
+      - STNODEFAULTFOLDER=1
+    networks:
+      - admin-mesh
+    restart: always
+
+  # ============ PROMETHEUS (Metrics) ============
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: admin-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - admin-internal
+    restart: always
+
+  # ============ GRAFANA (Dashboards) ============
+  grafana:
+    image: grafana/grafana:latest
+    container_name: admin-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - admin-internal
+    depends_on:
+      - prometheus
+    restart: always
+
+  # ============ LOKI (Log Aggregation) ============
+  loki:
+    image: grafana/loki:latest
+    container_name: admin-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    networks:
+      - admin-internal
+    restart: always
+
+  # ============ PROMTAIL (Log Shipper) ============
+  promtail:
+    image: grafana/promtail:latest
+    container_name: admin-promtail
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - admin-internal
+    depends_on:
+      - loki
+    restart: always
+
+volumes:
+  nginx_cache:
+  redis_data:
+  postgres_data:
+  zerotier_config:
+  netmaker_data:
+  syncthing_config:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+
+networks:
+  admin-mesh:
+    driver: bridge
+  admin-internal:
+    driver: bridge
