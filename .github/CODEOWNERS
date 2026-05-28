@@ -1,0 +1,48 @@
+# Code Owners for family-time Repository
+# This file automatically requests reviews from specified users for matching files
+
+# Global catch-all (final fallback)
+* @beparykamrul-dev
+
+# Infrastructure & Deployment
+infrastructure/terraform/**        @beparykamrul-dev
+infrastructure/ansible/**           @beparykamrul-dev
+infrastructure/docker/**            @beparykamrul-dev
+docker-compose*.yml                 @beparykamrul-dev
+Dockerfile*                         @beparykamrul-dev
+nginx/**                            @beparykamrul-dev
+keepalived/**                       @beparykamrul-dev
+
+# GitHub Actions & CI/CD
+.github/workflows/**                @beparykamrul-dev
+.github/actions/**                  @beparykamrul-dev
+
+# Backend
+backend/**                          @beparykamrul-dev
+backend/requirements.txt            @beparykamrul-dev
+backend/setup.py                    @beparykamrul-dev
+backend/manage.py                   @beparykamrul-dev
+backend/.env.example                @beparykamrul-dev
+
+# Frontend
+frontend/**                         @beparykamrul-dev
+frontend/package.json               @beparykamrul-dev
+frontend/package-lock.json          @beparykamrul-dev
+frontend/tsconfig.json              @beparykamrul-dev
+frontend/.env.example               @beparykamrul-dev
+
+# Configuration & Documentation
+*.md                                @beparykamrul-dev
+.gitignore                          @beparykamrul-dev
+.gitattributes                      @beparykamrul-dev
+.env.example                        @beparykamrul-dev
+CODEOWNERS                          @beparykamrul-dev
+LICENSE                             @beparykamrul-dev
+
+# Root configuration files
+LICENSE                             @beparykamrul-dev
+README.md                           @beparykamrul-dev
+CONTRIBUTING.md                     @beparykamrul-dev
+BRANCH_PROTECTION_RULES.md          @beparykamrul-dev
+MAIN_ADMIN_SETUP.md                 @beparykamrul-dev
+DEPLOYMENT_CHECKLIST.md             @beparykamrul-dev
