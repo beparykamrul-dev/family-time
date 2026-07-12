@@ -1,0 +1,32 @@
+{
+  "stats": {
+    "totalCustomers": 1240,
+    "activeUsers": 1184,
+    "monthlyRevenue": 245000.5,
+    "overdueCustomers": 34
+  },
+  "revenue": [
+    { "name": "Jan", "revenue": 30000 },
+    { "name": "Feb", "revenue": 28000 },
+    { "name": "Mar", "revenue": 42000 },
+    { "name": "Apr", "revenue": 35000 },
+    { "name": "May", "revenue": 49000 },
+    { "name": "Jun", "revenue": 41000 }
+  ],
+  "devices": [
+    { "id": 1, "name": "OLT-Rakib-1", "type": "OLT", "status": "online", "latitude": 23.8103, "longitude": 90.4125 },
+    { "id": 2, "name": "OLT-FTN-1", "type": "OLT", "status": "online", "latitude": 23.8150, "longitude": 90.4000 },
+    { "id": 3, "name": "ONU-1001", "type": "ONU", "status": "offline", "latitude": 23.8200, "longitude": 90.4100 },
+    { "id": 4, "name": "ONU-1002", "type": "ONU", "status": "online", "latitude": 23.8050, "longitude": 90.4200 }
+  ],
+  "alerts": [
+    { "id": "a1", "title": "ONU-1001 Offline", "time": "10m ago", "severity": "critical", "details": "ONU serial 1001 has lost link since 10 minutes." },
+    { "id": "a2", "title": "High CPU on OLT-Rakib-1", "time": "1h ago", "severity": "warning", "details": "CPU usage exceeded 85%" },
+    { "id": "a3", "title": "New Payment Received", "time": "2h ago", "severity": "info", "details": "Customer Ali paid invoice BILL-1024" }
+  ],
+  "recent": [
+    { "id": "r1", "type": "payment", "title": "BILL-1024 paid", "time": "2 hours ago" },
+    { "id": "r2", "type": "ticket", "title": "Ticket #334 assigned to technician", "time": "3 hours ago" },
+    { "id": "r3", "type": "network", "title": "ONU-1003 flapping detected", "time": "6 hours ago" }
+  ]
+}
